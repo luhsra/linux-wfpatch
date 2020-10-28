@@ -70,6 +70,7 @@
 #include <linux/dax.h>
 #include <linux/oom.h>
 #include <linux/numa.h>
+#include <linux/as_generation.h>
 
 #include <asm/io.h>
 #include <asm/mmu_context.h>
@@ -116,6 +117,11 @@ int randomize_va_space __read_mostly =
 #else
 					2;
 #endif
+
+static vm_fault_t pte_alloc_one_map(struct vm_fault *vmf);
+
+static void wrprotect_as_generation_siblings(struct mm_struct *mm,
+					     unsigned long address);
 
 static int __init disable_randmaps(char *s)
 {
@@ -699,7 +705,7 @@ out:
 static inline unsigned long
 copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		pte_t *dst_pte, pte_t *src_pte, struct vm_area_struct *vma,
-		unsigned long addr, int *rss)
+		unsigned long addr, int *rss, bool as_generation)
 {
 	unsigned long vm_flags = vma->vm_flags;
 	pte_t pte = *src_pte;
@@ -708,7 +714,7 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	/* pte contains position in swap or file, so copy. */
 	if (unlikely(!pte_present(pte))) {
 		swp_entry_t entry = pte_to_swp_entry(pte);
-
+		WARN_ON(as_generation && vma->as_generation_shared); // FIXME: Swap is currently not working
 		if (likely(!non_swap_entry(entry))) {
 			if (swap_duplicate(entry) < 0)
 				return entry.val;
@@ -728,7 +734,8 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 			rss[mm_counter(page)]++;
 
 			if (is_write_migration_entry(entry) &&
-					is_cow_mapping(vm_flags)) {
+			    is_cow_mapping(vm_flags) &&
+			    !(as_generation && vma->as_generation_shared)) {
 				/*
 				 * COW mappings require pages in both
 				 * parent and child to be set to read.
@@ -776,16 +783,23 @@ copy_one_pte(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	 * If it's a COW mapping, write protect it both
 	 * in the parent and the child
 	 */
-	if (is_cow_mapping(vm_flags) && pte_write(pte)) {
+	if (is_cow_mapping(vm_flags) && pte_write(pte) &&
+	    !(as_generation && vma->as_generation_shared)) {
 		ptep_set_wrprotect(src_mm, addr, src_pte);
 		pte = pte_wrprotect(pte);
+
+		/*
+		 * If there are more generations we have to
+		 * wrprotect these pages too.
+		 */
+		wrprotect_as_generation_siblings(src_mm, addr);
 	}
 
 	/*
 	 * If it's a shared mapping, mark it clean in
 	 * the child
 	 */
-	if (vm_flags & VM_SHARED)
+	if (vm_flags & VM_SHARED || (as_generation && vma->as_generation_shared))
 		pte = pte_mkclean(pte);
 	pte = pte_mkold(pte);
 
@@ -816,7 +830,7 @@ out_set_pte:
 
 static int copy_pte_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		   pmd_t *dst_pmd, pmd_t *src_pmd, struct vm_area_struct *vma,
-		   unsigned long addr, unsigned long end)
+		   unsigned long addr, unsigned long end, bool as_generation)
 {
 	pte_t *orig_src_pte, *orig_dst_pte;
 	pte_t *src_pte, *dst_pte;
@@ -854,7 +868,7 @@ again:
 			continue;
 		}
 		entry.val = copy_one_pte(dst_mm, src_mm, dst_pte, src_pte,
-							vma, addr, rss);
+					 vma, addr, rss, as_generation);
 		if (entry.val)
 			break;
 		progress += 8;
@@ -879,7 +893,7 @@ again:
 
 static inline int copy_pmd_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		pud_t *dst_pud, pud_t *src_pud, struct vm_area_struct *vma,
-		unsigned long addr, unsigned long end)
+		unsigned long addr, unsigned long end, bool as_generation)
 {
 	pmd_t *src_pmd, *dst_pmd;
 	unsigned long next;
@@ -905,7 +919,7 @@ static inline int copy_pmd_range(struct mm_struct *dst_mm, struct mm_struct *src
 		if (pmd_none_or_clear_bad(src_pmd))
 			continue;
 		if (copy_pte_range(dst_mm, src_mm, dst_pmd, src_pmd,
-						vma, addr, next))
+				   vma, addr, next, as_generation))
 			return -ENOMEM;
 	} while (dst_pmd++, src_pmd++, addr = next, addr != end);
 	return 0;
@@ -913,7 +927,7 @@ static inline int copy_pmd_range(struct mm_struct *dst_mm, struct mm_struct *src
 
 static inline int copy_pud_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		p4d_t *dst_p4d, p4d_t *src_p4d, struct vm_area_struct *vma,
-		unsigned long addr, unsigned long end)
+		unsigned long addr, unsigned long end, bool as_generation)
 {
 	pud_t *src_pud, *dst_pud;
 	unsigned long next;
@@ -939,7 +953,7 @@ static inline int copy_pud_range(struct mm_struct *dst_mm, struct mm_struct *src
 		if (pud_none_or_clear_bad(src_pud))
 			continue;
 		if (copy_pmd_range(dst_mm, src_mm, dst_pud, src_pud,
-						vma, addr, next))
+				   vma, addr, next, as_generation))
 			return -ENOMEM;
 	} while (dst_pud++, src_pud++, addr = next, addr != end);
 	return 0;
@@ -947,7 +961,7 @@ static inline int copy_pud_range(struct mm_struct *dst_mm, struct mm_struct *src
 
 static inline int copy_p4d_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		pgd_t *dst_pgd, pgd_t *src_pgd, struct vm_area_struct *vma,
-		unsigned long addr, unsigned long end)
+		unsigned long addr, unsigned long end, bool as_generation)
 {
 	p4d_t *src_p4d, *dst_p4d;
 	unsigned long next;
@@ -961,14 +975,14 @@ static inline int copy_p4d_range(struct mm_struct *dst_mm, struct mm_struct *src
 		if (p4d_none_or_clear_bad(src_p4d))
 			continue;
 		if (copy_pud_range(dst_mm, src_mm, dst_p4d, src_p4d,
-						vma, addr, next))
+				   vma, addr, next, as_generation))
 			return -ENOMEM;
 	} while (dst_p4d++, src_p4d++, addr = next, addr != end);
 	return 0;
 }
 
 int copy_page_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
-		struct vm_area_struct *vma)
+		    struct vm_area_struct *vma, bool as_generation)
 {
 	pgd_t *src_pgd, *dst_pgd;
 	unsigned long next;
@@ -1007,7 +1021,8 @@ int copy_page_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	 * parent mm. And a permission downgrade will only happen if
 	 * is_cow_mapping() returns true.
 	 */
-	is_cow = is_cow_mapping(vma->vm_flags);
+	is_cow = is_cow_mapping(vma->vm_flags) &&
+		!(as_generation && vma->as_generation_shared);
 
 	if (is_cow) {
 		mmu_notifier_range_init(&range, src_mm, addr, end);
@@ -1022,7 +1037,7 @@ int copy_page_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		if (pgd_none_or_clear_bad(src_pgd))
 			continue;
 		if (unlikely(copy_p4d_range(dst_mm, src_mm, dst_pgd, src_pgd,
-					    vma, addr, next))) {
+					    vma, addr, next, as_generation))) {
 			ret = -ENOMEM;
 			break;
 		}
@@ -2890,6 +2905,74 @@ out_release:
 	return ret;
 }
 
+static inline int follow_pte(struct mm_struct *mm, unsigned long address,
+			     pte_t **ptepp, spinlock_t **ptlp);
+
+/* Return vlaues:
+ * 0: Success, sibling page found -> finish page fault
+ * 1: No sibling page found
+ * 2: Sibling page found, but another error occured see ret
+ */
+static int find_as_generation_sibling_page(struct vm_fault *vmf, vm_fault_t *ret) {
+	struct vm_area_struct *vma = vmf->vma;
+	struct mm_struct *master_mm = vmf->vma->vm_mm->master_mm;
+	unsigned long copy_pte_ret;
+	int rss[NR_MM_COUNTERS];
+	pte_t *ptep;
+	spinlock_t *ptl;
+
+	if (follow_pte(master_mm, vmf->address, &ptep, &ptl) == 0) {
+		if (!vmf->pte) {
+			*ret = pte_alloc_one_map(vmf);
+			if (*ret != 0) {
+				pte_unmap_unlock(ptep, ptl);
+				return 2;
+			}
+		}
+
+		if (unlikely(!pte_none(*vmf->pte))) {
+			pte_unmap_unlock(vmf->pte, vmf->ptl);
+			pte_unmap_unlock(ptep, ptl);
+			*ret = VM_FAULT_NOPAGE;
+			return 2;
+		}
+
+		init_rss_vec(rss);
+		arch_enter_lazy_mmu_mode();
+		if (!pte_none(*ptep)) {
+			copy_pte_ret = copy_one_pte(vma->vm_mm, master_mm, vmf->pte, ptep,
+						    vma, vmf->address, rss, true);
+			BUG_ON(copy_pte_ret);
+			pte_unmap_unlock(vmf->pte, vmf->ptl);
+		}
+		arch_leave_lazy_mmu_mode();
+		pte_unmap_unlock(ptep, ptl);
+		add_mm_rss_vec(vma->vm_mm, rss);
+
+		return 0;
+	}
+	return 1;
+}
+
+/*
+ * This is used in copy_one_pte in the COW case.
+ * This is absolutely not optimized at the moment.
+ */
+static void wrprotect_as_generation_siblings(struct mm_struct *mm,
+					     unsigned long address) {
+	struct mm_struct *mm_cursor;
+	list_for_each_entry(mm_cursor,
+			    &mm->generation_siblings,
+			    generation_siblings) {
+		pte_t *ptep;
+		spinlock_t *ptl;
+		if (follow_pte(mm_cursor, address, &ptep, &ptl) == 0) {
+			ptep_set_wrprotect(mm_cursor, address, ptep);
+			pte_unmap_unlock(ptep, ptl);
+		}
+	}
+}
+
 /*
  * We enter with non-exclusive mmap_sem (to exclude vma changes,
  * but allow concurrent faults), and pte mapped but not yet locked.
@@ -3263,7 +3346,7 @@ vm_fault_t alloc_set_pte(struct vm_fault *vmf, struct mem_cgroup *memcg,
 		page_add_new_anon_rmap(page, vma, vmf->address, false);
 		mem_cgroup_commit_charge(page, memcg, false, false);
 		lru_cache_add_active_or_unevictable(page, vma);
-	} else {
+	}else {
 		inc_mm_counter_fast(vma->vm_mm, mm_counter_file(page));
 		page_add_file_rmap(page, false);
 	}
@@ -3804,17 +3887,52 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 	}
 
 	if (!vmf->pte) {
+		if (vmf->vma->as_generation_shared &&
+		    vmf->vma->vm_mm != vmf->vma->vm_mm->master_mm) {
+			/* Oh, this vma is possibly shared in multiple
+			   generations.  Let's check if the page is
+			   already mapped in the master_mm. */
+			int ret = 0;
+			vm_fault_t fault_ret = 0;
+			ret = find_as_generation_sibling_page(vmf, &fault_ret);
+			if (ret == 0)
+				return 0;
+			if (ret == 1)
+				return VM_FAULT_GENERATION_RETRY;
+			return fault_ret;
+		}
+
 		if (vma_is_anonymous(vmf->vma))
 			return do_anonymous_page(vmf);
 		else
 			return do_fault(vmf);
 	}
 
-	if (!pte_present(vmf->orig_pte))
+	if (!pte_present(vmf->orig_pte)) {
+		WARN_ON(vmf->vma->vm_mm != vmf->vma->vm_mm->master_mm);
 		return do_swap_page(vmf);
+	}
 
-	if (pte_protnone(vmf->orig_pte) && vma_is_accessible(vmf->vma))
+	if (vmf->vma->as_generation_shared) {
+		if (vmf->vma->vm_mm != vmf->vma->vm_mm->master_mm) {
+			return VM_FAULT_GENERATION_RETRY;
+		} else if (has_as_generations(vmf->vma->vm_mm)) {
+			struct mm_struct *mm_cursor;
+			list_for_each_entry(mm_cursor,
+					    &vmf->vma->vm_mm->generation_siblings,
+					    generation_siblings) {
+				struct vm_area_struct *other_vma =
+					find_vma(mm_cursor, vmf->address);
+				WARN_ON(other_vma == NULL);
+				zap_page_range(other_vma, vmf->address, PAGE_SIZE);
+			}
+		}
+	}
+
+	if (pte_protnone(vmf->orig_pte) && vma_is_accessible(vmf->vma)) {
+		WARN_ON(vmf->vma->vm_mm != vmf->vma->vm_mm->master_mm);
 		return do_numa_page(vmf);
+	}
 
 	vmf->ptl = pte_lockptr(vmf->vma->vm_mm, vmf->pmd);
 	spin_lock(vmf->ptl);
@@ -3965,10 +4083,19 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 	if (flags & FAULT_FLAG_USER)
 		mem_cgroup_enter_user_fault();
 
-	if (unlikely(is_vm_hugetlb_page(vma)))
+	if (unlikely(is_vm_hugetlb_page(vma))) {
+		WARN_ON(vma->vm_mm != vma->vm_mm->master_mm);
 		ret = hugetlb_fault(vma->vm_mm, vma, address, flags);
-	else
+	} else {
 		ret = __handle_mm_fault(vma, address, flags);
+		if (ret == VM_FAULT_GENERATION_RETRY) {
+			struct vm_area_struct *master_vma =
+				find_vma(vma->vm_mm->master_mm, address);
+			BUG_ON(!master_vma);
+			ret = __handle_mm_fault(master_vma, address, flags);
+			__handle_mm_fault(vma, address, flags);
+		}
+	}
 
 	if (flags & FAULT_FLAG_USER) {
 		mem_cgroup_exit_user_fault();
