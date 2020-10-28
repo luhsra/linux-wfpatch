@@ -319,6 +319,7 @@ success:
 	userfaultfd_unmap_complete(mm, &uf);
 	if (populate)
 		mm_populate(oldbrk, newbrk - oldbrk);
+	membench_checkpoint(false);
 	return brk;
 
 out:
@@ -1626,6 +1627,8 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 		}
 	}
 
+	membench_checkpoint(false);
+
 	return addr;
 }
 
@@ -2906,6 +2909,8 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 {
 	int ret;
 
+	membench_checkpoint(false);
+
 	ret = __do_munmap(mm, start, len, uf, false);
 
 	/* Do the same for all as_generations */
@@ -2931,6 +2936,8 @@ static int __vm_munmap(unsigned long start, size_t len, bool downgrade)
 
 	if (down_write_killable(&mm->master_mm->mmap_sem))
 		return -EINTR;
+
+	membench_checkpoint(false);
 
 	ret = __do_munmap(mm, start, len, &uf, downgrade);
 
