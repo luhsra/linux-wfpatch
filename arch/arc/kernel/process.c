@@ -91,10 +91,10 @@ fault:
 	if (unlikely(ret != -EFAULT))
 		 goto fail;
 
-	down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->master_mm->mmap_sem);
 	ret = fixup_user_fault(current, current->mm, (unsigned long) uaddr,
 			       FAULT_FLAG_WRITE, NULL);
-	up_read(&current->mm->mmap_sem);
+	up_read(&current->mm->master_mm->mmap_sem);
 
 	if (likely(!ret))
 		 goto again;

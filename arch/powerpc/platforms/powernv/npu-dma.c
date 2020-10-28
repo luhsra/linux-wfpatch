@@ -1124,7 +1124,7 @@ int pnv_npu2_handle_fault(struct npu_context *context, uintptr_t *ea,
 	/* mmap_sem should be held so the struct_mm must be present */
 	struct mm_struct *mm = context->mm;
 
-	WARN_ON(!rwsem_is_locked(&mm->mmap_sem));
+	WARN_ON(!rwsem_is_locked(&mm->master_mm->mmap_sem));
 
 	for (i = 0; i < count; i++) {
 		is_write = flags[i] & NPU2_WRITE;

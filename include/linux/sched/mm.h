@@ -67,7 +67,7 @@ static inline void mmdrop(struct mm_struct *mm)
  */
 static inline bool mmget_still_valid(struct mm_struct *mm)
 {
-	return likely(!mm->core_state);
+	return likely(!mm->master_mm->core_state);
 }
 
 /**

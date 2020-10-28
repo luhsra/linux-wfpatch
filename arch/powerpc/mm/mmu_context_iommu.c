@@ -59,7 +59,7 @@ static long mm_iommu_adjust_locked_vm(struct mm_struct *mm,
 	if (!npages)
 		return 0;
 
-	down_write(&mm->mmap_sem);
+	down_write(&mm->master_mm->mmap_sem);
 
 	if (incr) {
 		locked = mm->locked_vm + npages;
@@ -80,7 +80,7 @@ static long mm_iommu_adjust_locked_vm(struct mm_struct *mm,
 			npages << PAGE_SHIFT,
 			mm->locked_vm << PAGE_SHIFT,
 			rlimit(RLIMIT_MEMLOCK));
-	up_write(&mm->mmap_sem);
+	up_write(&mm->master_mm->mmap_sem);
 
 	return ret;
 }
@@ -134,7 +134,7 @@ static long mm_iommu_do_alloc(struct mm_struct *mm, unsigned long ua,
 		goto unlock_exit;
 	}
 
-	down_read(&mm->mmap_sem);
+	down_read(&mm->master_mm->mmap_sem);
 	chunk = (1UL << (PAGE_SHIFT + MAX_ORDER - 1)) /
 			sizeof(struct vm_area_struct *);
 	chunk = min(chunk, entries);
@@ -151,7 +151,7 @@ static long mm_iommu_do_alloc(struct mm_struct *mm, unsigned long ua,
 			pinned += ret;
 		break;
 	}
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 	if (pinned != entries) {
 		if (!ret)
 			ret = -EFAULT;

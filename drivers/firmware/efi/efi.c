@@ -84,6 +84,8 @@ struct mm_struct efi_mm = {
 	.page_table_lock	= __SPIN_LOCK_UNLOCKED(efi_mm.page_table_lock),
 	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
 	.cpu_bitmap		= { [BITS_TO_LONGS(NR_CPUS)] = 0},
+	.generation_siblings 	= LIST_HEAD_INIT(efi_mm.generation_siblings),
+	.master_mm		= &efi_mm,
 };
 
 struct workqueue_struct *efi_rts_wq;

@@ -15,9 +15,9 @@ DEFINE_SHOW_ATTRIBUTE(ptdump);
 static int ptdump_curknl_show(struct seq_file *m, void *v)
 {
 	if (current->mm->pgd) {
-		down_read(&current->mm->mmap_sem);
+		down_read(&current->mm->master_mm->mmap_sem);
 		ptdump_walk_pgd_level_debugfs(m, current->mm->pgd, false);
-		up_read(&current->mm->mmap_sem);
+		up_read(&current->mm->master_mm->mmap_sem);
 	}
 	return 0;
 }
@@ -30,9 +30,9 @@ static struct dentry *pe_curusr;
 static int ptdump_curusr_show(struct seq_file *m, void *v)
 {
 	if (current->mm->pgd) {
-		down_read(&current->mm->mmap_sem);
+		down_read(&current->mm->master_mm->mmap_sem);
 		ptdump_walk_pgd_level_debugfs(m, current->mm->pgd, true);
-		up_read(&current->mm->mmap_sem);
+		up_read(&current->mm->master_mm->mmap_sem);
 	}
 	return 0;
 }

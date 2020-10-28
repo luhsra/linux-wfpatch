@@ -211,7 +211,7 @@ static int get_vma_info(struct mm_struct *mm, u64 addr,
 	struct vm_area_struct *vma = NULL;
 	int rc = 0;
 
-	down_read(&mm->mmap_sem);
+	down_read(&mm->master_mm->mmap_sem);
 
 	vma = find_vma(mm, addr);
 	if (!vma) {
@@ -222,7 +222,7 @@ static int get_vma_info(struct mm_struct *mm, u64 addr,
 	*vma_start = vma->vm_start;
 	*vma_end = vma->vm_end;
 out:
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 	return rc;
 }
 

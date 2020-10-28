@@ -957,12 +957,12 @@ give_sigsegv:
 		si_code = SEGV_ACCERR;
 	else {
 		struct mm_struct *mm = current->mm;
-		down_read(&mm->mmap_sem);
+		down_read(&mm->master_mm->mmap_sem);
 		if (find_vma(mm, (unsigned long)va))
 			si_code = SEGV_ACCERR;
 		else
 			si_code = SEGV_MAPERR;
-		up_read(&mm->mmap_sem);
+		up_read(&mm->master_mm->mmap_sem);
 	}
 	send_sig_fault(SIGSEGV, si_code, va, 0, current);
 	return;

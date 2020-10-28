@@ -1382,7 +1382,7 @@ int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 		if (flags & FAULT_FLAG_RETRY_NOWAIT)
 			return 0;
 
-		up_read(&mm->mmap_sem);
+		up_read(&mm->master_mm->mmap_sem);
 		if (flags & FAULT_FLAG_KILLABLE)
 			wait_on_page_locked_killable(page);
 		else
@@ -1394,7 +1394,7 @@ int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 
 			ret = __lock_page_killable(page);
 			if (ret) {
-				up_read(&mm->mmap_sem);
+				up_read(&mm->master_mm->mmap_sem);
 				return 0;
 			}
 		} else
@@ -2406,7 +2406,7 @@ static struct file *maybe_unlock_mmap_for_io(struct vm_fault *vmf,
 	if ((flags & (FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_RETRY_NOWAIT)) ==
 	    FAULT_FLAG_ALLOW_RETRY) {
 		fpin = get_file(vmf->vma->vm_file);
-		up_read(&vmf->vma->vm_mm->mmap_sem);
+		up_read(&vmf->vma->vm_mm->master_mm->mmap_sem);
 	}
 	return fpin;
 }
@@ -2446,7 +2446,7 @@ static int lock_page_maybe_drop_mmap(struct vm_fault *vmf, struct page *page,
 			 * mmap_sem here and return 0 if we don't have a fpin.
 			 */
 			if (*fpin == NULL)
-				up_read(&vmf->vma->vm_mm->mmap_sem);
+				up_read(&vmf->vma->vm_mm->master_mm->mmap_sem);
 			return 0;
 		}
 	} else

@@ -1355,9 +1355,9 @@ int amdgpu_amdkfd_gpuvm_map_memory_to_gpu(
 	 * concurrently and the queues are actually stopped
 	 */
 	if (amdgpu_ttm_tt_get_usermm(bo->tbo.ttm)) {
-		down_write(&current->mm->mmap_sem);
+		down_write(&current->mm->master_mm->mmap_sem);
 		is_invalid_userptr = atomic_read(&mem->invalid);
-		up_write(&current->mm->mmap_sem);
+		up_write(&current->mm->master_mm->mmap_sem);
 	}
 
 	mutex_lock(&mem->lock);

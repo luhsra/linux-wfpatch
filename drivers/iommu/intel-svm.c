@@ -577,7 +577,7 @@ static irqreturn_t prq_event_thread(int irq, void *d)
 		if (!is_canonical_address(address))
 			goto bad_req;
 
-		down_read(&svm->mm->mmap_sem);
+		down_read(&svm->mm->master_mm->mmap_sem);
 		vma = find_extend_vma(svm->mm, address);
 		if (!vma || address < vma->vm_start)
 			goto invalid;
@@ -592,7 +592,7 @@ static irqreturn_t prq_event_thread(int irq, void *d)
 
 		result = QI_RESP_SUCCESS;
 	invalid:
-		up_read(&svm->mm->mmap_sem);
+		up_read(&svm->mm->master_mm->mmap_sem);
 		mmput(svm->mm);
 	bad_req:
 		/* Accounting for major/minor faults? */

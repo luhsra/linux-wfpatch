@@ -36,5 +36,7 @@ struct mm_struct init_mm = {
 	.mmlist		= LIST_HEAD_INIT(init_mm.mmlist),
 	.user_ns	= &init_user_ns,
 	.cpu_bitmap	= { [BITS_TO_LONGS(NR_CPUS)] = 0},
+        .generation_siblings = LIST_HEAD_INIT(init_mm.generation_siblings),
+        .master_mm	= &init_mm,
 	INIT_MM_CONTEXT(init_mm)
 };

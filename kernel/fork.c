@@ -470,7 +470,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 	LIST_HEAD(uf);
 
 	uprobe_start_dup_mmap();
-	if (down_write_killable(&oldmm->mmap_sem)) {
+	if (down_write_killable(&oldmm->master_mm->mmap_sem)) {
 		retval = -EINTR;
 		goto fail_uprobe_end;
 	}
@@ -606,7 +606,7 @@ out:
 			flush_tlb_mm(mm_cursor);
 		}
 	}
-	up_write(&oldmm->mmap_sem);
+	up_write(&oldmm->master_mm->mmap_sem);
 	dup_userfaultfd_complete(&uf);
 fail_uprobe_end:
 	uprobe_end_dup_mmap();
@@ -636,9 +636,9 @@ static inline void mm_free_pgd(struct mm_struct *mm)
 #else
 static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 {
-	down_write(&oldmm->mmap_sem);
+	down_write(&oldmm->master_mm->mmap_sem);
 	RCU_INIT_POINTER(mm->exe_file, get_mm_exe_file(oldmm));
-	up_write(&oldmm->mmap_sem);
+	up_write(&oldmm->master_mm->mmap_sem);
 	return 0;
 }
 #define mm_alloc_pgd(mm)	(0)
@@ -2698,7 +2698,7 @@ static __latent_entropy int as_generation_dup_mmap(struct mm_struct *mm,
 	LIST_HEAD(uf);
 
 	uprobe_start_dup_mmap();
-	if (down_write_killable(&oldmm->mmap_sem)) {
+	if (down_write_killable(&oldmm->master_mm->mmap_sem)) {
 		retval = -EINTR;
 		goto fail_uprobe_end;
 	}
@@ -2819,7 +2819,7 @@ static __latent_entropy int as_generation_dup_mmap(struct mm_struct *mm,
 		      &oldmm->generation_siblings);
 out:
 	flush_tlb_mm(oldmm);
-	up_write(&oldmm->mmap_sem);
+	up_write(&oldmm->master_mm->mmap_sem);
 	dup_userfaultfd_complete(&uf);
 fail_uprobe_end:
 	uprobe_end_dup_mmap();

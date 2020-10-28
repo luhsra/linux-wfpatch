@@ -2559,7 +2559,7 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, void __user *arg,
 		}
 
 		ret = 0;
-		down_read(&current->mm->mmap_sem);
+		down_read(&current->mm->master_mm->mmap_sem);
 		pret = get_user_pages_longterm(ubuf, nr_pages, FOLL_WRITE,
 						pages, vmas);
 		if (pret == nr_pages) {
@@ -2576,7 +2576,7 @@ static int io_sqe_buffer_register(struct io_ring_ctx *ctx, void __user *arg,
 		} else {
 			ret = pret < 0 ? pret : -EFAULT;
 		}
-		up_read(&current->mm->mmap_sem);
+		up_read(&current->mm->master_mm->mmap_sem);
 		if (ret) {
 			/*
 			 * if we did partial map, or found file backed vmas,

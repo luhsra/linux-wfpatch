@@ -100,12 +100,12 @@ static void set_segfault(struct pt_regs *regs, unsigned long addr)
 {
 	int si_code;
 
-	down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->master_mm->mmap_sem);
 	if (find_vma(current->mm, addr) == NULL)
 		si_code = SEGV_MAPERR;
 	else
 		si_code = SEGV_ACCERR;
-	up_read(&current->mm->mmap_sem);
+	up_read(&current->mm->master_mm->mmap_sem);
 
 	pr_debug("SWP{B} emulation: access caused memory abort!\n");
 	arm_notify_die("Illegal memory access", regs,

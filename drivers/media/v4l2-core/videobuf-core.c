@@ -537,7 +537,7 @@ int videobuf_qbuf(struct videobuf_queue *q, struct v4l2_buffer *b)
 	MAGIC_CHECK(q->int_ops->magic, MAGIC_QTYPE_OPS);
 
 	if (b->memory == V4L2_MEMORY_MMAP)
-		down_read(&current->mm->mmap_sem);
+		down_read(&current->mm->master_mm->mmap_sem);
 
 	videobuf_queue_lock(q);
 	retval = -EBUSY;
@@ -624,7 +624,7 @@ done:
 	videobuf_queue_unlock(q);
 
 	if (b->memory == V4L2_MEMORY_MMAP)
-		up_read(&current->mm->mmap_sem);
+		up_read(&current->mm->master_mm->mmap_sem);
 
 	return retval;
 }

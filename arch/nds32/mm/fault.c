@@ -123,12 +123,12 @@ void do_page_fault(unsigned long entry, unsigned long addr,
 	 * validly references user space from well defined areas of the code,
 	 * we can bug out early if this is from code which shouldn't.
 	 */
-	if (unlikely(!down_read_trylock(&mm->mmap_sem))) {
+	if (unlikely(!down_read_trylock(&mm->master_mm->mmap_sem))) {
 		if (!user_mode(regs) &&
 		    !search_exception_tables(instruction_pointer(regs)))
 			goto no_context;
 retry:
-		down_read(&mm->mmap_sem);
+		down_read(&mm->master_mm->mmap_sem);
 	} else {
 		/*
 		 * The above down_read_trylock() might have succeeded in which
@@ -253,7 +253,7 @@ good_area:
 		}
 	}
 
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 	return;
 
 	/*
@@ -261,7 +261,7 @@ good_area:
 	 * Fix it, but check if it's kernel or user first..
 	 */
 bad_area:
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 
 bad_area_nosemaphore:
 
@@ -321,14 +321,14 @@ no_context:
 	 */
 
 out_of_memory:
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 	if (!user_mode(regs))
 		goto no_context;
 	pagefault_out_of_memory();
 	return;
 
 do_sigbus:
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 
 	/* Kernel mode? Handle exceptions or die */
 	if (!user_mode(regs))

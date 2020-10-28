@@ -532,7 +532,7 @@ get_futex_key(u32 __user *uaddr, int fshared, union futex_key *key, enum futex_a
 	 *        but access_ok() should be faster than find_vma()
 	 */
 	if (!fshared) {
-		key->private.mm = mm;
+		key->private.mm = mm->master_mm;
 		key->private.address = address;
 		get_futex_key_refs(key);  /* implies smp_mb(); (B) */
 		return 0;
@@ -634,7 +634,7 @@ again:
 		}
 
 		key->both.offset |= FUT_OFF_MMSHARED; /* ref taken on mm */
-		key->private.mm = mm;
+		key->private.mm = mm->master_mm;
 		key->private.address = address;
 
 		get_futex_key_refs(key); /* implies smp_mb(); (B) */
@@ -731,10 +731,10 @@ static int fault_in_user_writeable(u32 __user *uaddr)
 	struct mm_struct *mm = current->mm;
 	int ret;
 
-	down_read(&mm->mmap_sem);
+	down_read(&mm->master_mm->mmap_sem);
 	ret = fixup_user_fault(current, mm, (unsigned long)uaddr,
 			       FAULT_FLAG_WRITE, NULL);
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 
 	return ret < 0 ? ret : 0;
 }

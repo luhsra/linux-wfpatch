@@ -499,7 +499,7 @@ static void do_fault(struct work_struct *work)
 		flags |= FAULT_FLAG_WRITE;
 	flags |= FAULT_FLAG_REMOTE;
 
-	down_read(&mm->mmap_sem);
+	down_read(&mm->master_mm->mmap_sem);
 	vma = find_extend_vma(mm, address);
 	if (!vma || address < vma->vm_start)
 		/* failed to get a vma in the right range */
@@ -511,7 +511,7 @@ static void do_fault(struct work_struct *work)
 
 	ret = handle_mm_fault(vma, address, flags);
 out:
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 
 	if (ret & VM_FAULT_ERROR)
 		/* failed to service fault */

@@ -403,12 +403,12 @@ void arm64_notify_segfault(unsigned long addr)
 {
 	int code;
 
-	down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->master_mm->mmap_sem);
 	if (find_vma(current->mm, addr) == NULL)
 		code = SEGV_MAPERR;
 	else
 		code = SEGV_ACCERR;
-	up_read(&current->mm->mmap_sem);
+	up_read(&current->mm->master_mm->mmap_sem);
 
 	force_signal_inject(SIGSEGV, code, addr);
 }

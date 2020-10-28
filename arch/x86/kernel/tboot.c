@@ -107,6 +107,8 @@ static struct mm_struct tboot_mm = {
 	.mmap_sem       = __RWSEM_INITIALIZER(init_mm.mmap_sem),
 	.page_table_lock =  __SPIN_LOCK_UNLOCKED(init_mm.page_table_lock),
 	.mmlist         = LIST_HEAD_INIT(init_mm.mmlist),
+	.generation_siblings = LIST_HEAD_INIT(tboot_mm.generation_siblings),
+	.master_mm	= &tboot_mm,
 };
 
 static inline void switch_to_tboot_pt(void)

@@ -130,7 +130,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 	vdso_mapping_len += L1_cache_info[DCACHE].aliasing_num - 1;
 #endif
 
-	if (down_write_killable(&mm->mmap_sem))
+	if (down_write_killable(&mm->master_mm->mmap_sem))
 		return -EINTR;
 
 	addr = vdso_random_addr(vdso_mapping_len);
@@ -185,12 +185,12 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 		goto up_fail;
 	}
 
-	up_write(&mm->mmap_sem);
+	up_write(&mm->master_mm->mmap_sem);
 	return 0;
 
 up_fail:
 	mm->context.vdso = NULL;
-	up_write(&mm->mmap_sem);
+	up_write(&mm->master_mm->mmap_sem);
 	return ret;
 }
 

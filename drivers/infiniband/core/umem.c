@@ -188,13 +188,13 @@ struct ib_umem *ib_umem_get(struct ib_udata *udata, unsigned long addr,
 	sg_list_start = umem->sg_head.sgl;
 
 	while (npages) {
-		down_read(&mm->mmap_sem);
+		down_read(&mm->master_mm->mmap_sem);
 		ret = get_user_pages_longterm(cur_base,
 				     min_t(unsigned long, npages,
 					   PAGE_SIZE / sizeof (struct page *)),
 				     gup_flags, page_list, vma_list);
 		if (ret < 0) {
-			up_read(&mm->mmap_sem);
+			up_read(&mm->master_mm->mmap_sem);
 			goto umem_release;
 		}
 
@@ -211,7 +211,7 @@ struct ib_umem *ib_umem_get(struct ib_udata *udata, unsigned long addr,
 
 			sg_set_page(sg, page_list[i], PAGE_SIZE, 0);
 		}
-		up_read(&mm->mmap_sem);
+		up_read(&mm->master_mm->mmap_sem);
 
 		/* preparing for next loop */
 		sg_list_start = sg;

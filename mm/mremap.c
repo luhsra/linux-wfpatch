@@ -724,7 +724,7 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	if (!new_len)
 		return ret;
 
-	if (down_write_killable(&current->mm->mmap_sem))
+	if (down_write_killable(&current->mm->master_mm->mmap_sem))
 		return -EINTR;
 
 	ret = do_mremap(mm, &downgraded, &locked, &uf, &uf_unmap_early,
@@ -748,9 +748,9 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 	}
 
 	if (downgraded)
-		up_read(&current->mm->mmap_sem);
+		up_read(&current->mm->master_mm->mmap_sem);
 	else
-		up_write(&current->mm->mmap_sem);
+		up_write(&current->mm->master_mm->mmap_sem);
 	if (locked && new_len > old_len)
 		mm_populate(new_addr + old_len, new_len - old_len);
 	userfaultfd_unmap_complete(mm, &uf_unmap_early);

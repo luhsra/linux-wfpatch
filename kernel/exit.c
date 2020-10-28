@@ -510,12 +510,12 @@ static void exit_mm(void)
 	 * will increment ->nr_threads for each thread in the
 	 * group with ->mm != NULL.
 	 */
-	down_read(&mm->mmap_sem);
-	core_state = mm->core_state;
+	down_read(&mm->master_mm->mmap_sem);
+	core_state = mm->master_mm->core_state;
 	if (core_state) {
 		struct core_thread self;
 
-		up_read(&mm->mmap_sem);
+		up_read(&mm->master_mm->mmap_sem);
 
 		self.task = current;
 		self.next = xchg(&core_state->dumper.next, &self);
@@ -533,14 +533,15 @@ static void exit_mm(void)
 			freezable_schedule();
 		}
 		__set_current_state(TASK_RUNNING);
-		down_read(&mm->mmap_sem);
+		down_read(&mm->master_mm->mmap_sem);
 	}
+
 	mmgrab(mm);
 	BUG_ON(mm != current->active_mm);
 	/* more a memory barrier than a real lock */
 	task_lock(current);
 	current->mm = NULL;
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 	enter_lazy_tlb(mm, current);
 	task_unlock(current);
 	mm_update_next_owner(mm);

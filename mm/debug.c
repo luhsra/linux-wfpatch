@@ -173,7 +173,7 @@ void dump_mm(const struct mm_struct *mm)
 		mm->start_code, mm->end_code, mm->start_data, mm->end_data,
 		mm->start_brk, mm->brk, mm->start_stack,
 		mm->arg_start, mm->arg_end, mm->env_start, mm->env_end,
-		mm->binfmt, mm->flags, mm->core_state,
+		mm->binfmt, mm->flags, mm->master_mm->core_state,
 #ifdef CONFIG_AIO
 		mm->ioctx_table,
 #endif

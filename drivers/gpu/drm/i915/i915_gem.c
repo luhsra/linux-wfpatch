@@ -1753,7 +1753,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 		struct mm_struct *mm = current->mm;
 		struct vm_area_struct *vma;
 
-		if (down_write_killable(&mm->mmap_sem)) {
+		if (down_write_killable(&mm->master_mm->mmap_sem)) {
 			addr = -EINTR;
 			goto err;
 		}
@@ -1763,7 +1763,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 				pgprot_writecombine(vm_get_page_prot(vma->vm_flags));
 		else
 			addr = -ENOMEM;
-		up_write(&mm->mmap_sem);
+		up_write(&mm->master_mm->mmap_sem);
 		if (IS_ERR_VALUE(addr))
 			goto err;
 

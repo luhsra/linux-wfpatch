@@ -408,15 +408,15 @@ int ib_umem_odp_get(struct ib_umem_odp *umem_odp, int access)
 		struct vm_area_struct *vma;
 		struct hstate *h;
 
-		down_read(&mm->mmap_sem);
+		down_read(&mm->master_mm->mmap_sem);
 		vma = find_vma(mm, ib_umem_start(umem));
 		if (!vma || !is_vm_hugetlb_page(vma)) {
-			up_read(&mm->mmap_sem);
+			up_read(&mm->master_mm->mmap_sem);
 			return -EINVAL;
 		}
 		h = hstate_vma(vma);
 		umem->page_shift = huge_page_shift(h);
-		up_read(&mm->mmap_sem);
+		up_read(&mm->master_mm->mmap_sem);
 		umem->hugetlb = 1;
 	} else {
 		umem->hugetlb = 0;
@@ -635,7 +635,7 @@ int ib_umem_odp_map_dma_pages(struct ib_umem_odp *umem_odp, u64 user_virt,
 				(bcnt + BIT(page_shift) - 1) >> page_shift,
 				PAGE_SIZE / sizeof(struct page *));
 
-		down_read(&owning_mm->mmap_sem);
+		down_read(&owning_mm->master_mm->mmap_sem);
 		/*
 		 * Note: this might result in redundent page getting. We can
 		 * avoid this by checking dma_list to be 0 before calling
@@ -646,7 +646,7 @@ int ib_umem_odp_map_dma_pages(struct ib_umem_odp *umem_odp, u64 user_virt,
 		npages = get_user_pages_remote(owning_process, owning_mm,
 				user_virt, gup_num_pages,
 				flags, local_page_list, NULL, NULL);
-		up_read(&owning_mm->mmap_sem);
+		up_read(&owning_mm->master_mm->mmap_sem);
 
 		if (npages < 0) {
 			if (npages != -EAGAIN)

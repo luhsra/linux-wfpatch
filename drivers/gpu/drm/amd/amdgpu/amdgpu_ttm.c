@@ -744,7 +744,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 	if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
 		flags |= FOLL_WRITE;
 
-	down_read(&mm->mmap_sem);
+	down_read(&mm->master_mm->mmap_sem);
 
 	if (gtt->userflags & AMDGPU_GEM_USERPTR_ANONONLY) {
 		/*
@@ -756,7 +756,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 		vma = find_vma(mm, gtt->userptr);
 		if (!vma || vma->vm_file || vma->vm_end < end) {
-			up_read(&mm->mmap_sem);
+			up_read(&mm->master_mm->mmap_sem);
 			return -EPERM;
 		}
 	}
@@ -791,12 +791,12 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 	} while (pinned < ttm->num_pages);
 
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 	return 0;
 
 release_pages:
 	release_pages(pages, pinned);
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 	return r;
 }
 

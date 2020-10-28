@@ -340,7 +340,7 @@ static int zap_threads(struct task_struct *tsk, struct mm_struct *mm,
 
 	spin_lock_irq(&tsk->sighand->siglock);
 	if (!signal_group_exit(tsk->signal)) {
-		mm->core_state = core_state;
+		mm->master_mm->core_state = core_state;
 		tsk->signal->group_exit_task = tsk;
 		nr = zap_process(tsk, exit_code, 0);
 		clear_tsk_thread_flag(tsk, TIF_SIGPENDING);
@@ -417,12 +417,12 @@ static int coredump_wait(int exit_code, struct core_state *core_state)
 	core_state->dumper.task = tsk;
 	core_state->dumper.next = NULL;
 
-	if (down_write_killable(&mm->mmap_sem))
+	if (down_write_killable(&mm->master_mm->mmap_sem))
 		return -EINTR;
 
-	if (!mm->core_state)
+	if (!mm->master_mm->core_state)
 		core_waiters = zap_threads(tsk, mm, core_state, exit_code);
-	up_write(&mm->mmap_sem);
+	up_write(&mm->master_mm->mmap_sem);
 
 	if (core_waiters > 0) {
 		struct core_thread *ptr;
@@ -457,7 +457,7 @@ static void coredump_finish(struct mm_struct *mm, bool core_dumped)
 	current->signal->flags = SIGNAL_GROUP_EXIT;
 	spin_unlock_irq(&current->sighand->siglock);
 
-	next = mm->core_state->dumper.next;
+	next = mm->master_mm->core_state->dumper.next;
 	while ((curr = next) != NULL) {
 		next = curr->next;
 		task = curr->task;
@@ -470,7 +470,7 @@ static void coredump_finish(struct mm_struct *mm, bool core_dumped)
 		wake_up_process(task);
 	}
 
-	mm->core_state = NULL;
+	mm->master_mm->core_state = NULL;
 }
 
 static bool dump_interrupted(void)

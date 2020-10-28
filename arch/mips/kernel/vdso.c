@@ -121,7 +121,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 	struct vm_area_struct *vma;
 	int ret;
 
-	if (down_write_killable(&mm->mmap_sem))
+	if (down_write_killable(&mm->master_mm->mmap_sem))
 		return -EINTR;
 
 	/* Map delay slot emulation page */
@@ -212,6 +212,6 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
 	ret = 0;
 
 out:
-	up_write(&mm->mmap_sem);
+	up_write(&mm->master_mm->mmap_sem);
 	return ret;
 }

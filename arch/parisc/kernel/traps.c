@@ -684,7 +684,7 @@ void notrace handle_interruption(int code, struct pt_regs *regs)
 		if (user_mode(regs)) {
 			struct vm_area_struct *vma;
 
-			down_read(&current->mm->mmap_sem);
+			down_read(&current->mm->master_mm->mmap_sem);
 			vma = find_vma(current->mm,regs->iaoq[0]);
 			if (vma && (regs->iaoq[0] >= vma->vm_start)
 				&& (vma->vm_flags & VM_EXEC)) {
@@ -692,10 +692,10 @@ void notrace handle_interruption(int code, struct pt_regs *regs)
 				fault_address = regs->iaoq[0];
 				fault_space = regs->iasq[0];
 
-				up_read(&current->mm->mmap_sem);
+				up_read(&current->mm->master_mm->mmap_sem);
 				break; /* call do_page_fault() */
 			}
-			up_read(&current->mm->mmap_sem);
+			up_read(&current->mm->master_mm->mmap_sem);
 		}
 		/* Fall Through */
 	case 27: 

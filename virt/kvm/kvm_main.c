@@ -1337,7 +1337,7 @@ unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn)
 	if (kvm_is_error_hva(addr))
 		return PAGE_SIZE;
 
-	down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->master_mm->mmap_sem);
 	vma = find_vma(current->mm, addr);
 	if (!vma)
 		goto out;
@@ -1345,7 +1345,7 @@ unsigned long kvm_host_page_size(struct kvm *kvm, gfn_t gfn)
 	size = vma_kernel_pagesize(vma);
 
 out:
-	up_read(&current->mm->mmap_sem);
+	up_read(&current->mm->master_mm->mmap_sem);
 
 	return size;
 }
@@ -1600,7 +1600,7 @@ static kvm_pfn_t hva_to_pfn(unsigned long addr, bool atomic, bool *async,
 	if (npages == 1)
 		return pfn;
 
-	down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->master_mm->mmap_sem);
 	if (npages == -EHWPOISON ||
 	      (!async && check_user_page_hwpoison(addr))) {
 		pfn = KVM_PFN_ERR_HWPOISON;
@@ -1624,7 +1624,7 @@ retry:
 		pfn = KVM_PFN_ERR_FAULT;
 	}
 exit:
-	up_read(&current->mm->mmap_sem);
+	up_read(&current->mm->master_mm->mmap_sem);
 	return pfn;
 }
 

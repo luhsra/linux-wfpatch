@@ -63,7 +63,7 @@ static long kvmppc_account_memlimit(unsigned long stt_pages, bool inc)
 	if (!current || !current->mm)
 		return ret; /* process exited */
 
-	down_write(&current->mm->mmap_sem);
+	down_write(&current->mm->master_mm->mmap_sem);
 
 	if (inc) {
 		unsigned long locked, lock_limit;
@@ -88,7 +88,7 @@ static long kvmppc_account_memlimit(unsigned long stt_pages, bool inc)
 			rlimit(RLIMIT_MEMLOCK),
 			ret ? " - exceeded" : "");
 
-	up_write(&current->mm->mmap_sem);
+	up_write(&current->mm->master_mm->mmap_sem);
 
 	return ret;
 }

@@ -171,7 +171,7 @@ nouveau_svmm_bind(struct drm_device *dev, void *data,
 	 */
 
 	mm = get_task_mm(current);
-	down_read(&mm->mmap_sem);
+	down_read(&mm->master_mm->mmap_sem);
 
 	for (addr = args->va_start, end = args->va_start + size; addr < end;) {
 		struct vm_area_struct *vma;
@@ -194,7 +194,7 @@ nouveau_svmm_bind(struct drm_device *dev, void *data,
 	 */
 	args->result = 0;
 
-	up_read(&mm->mmap_sem);
+	up_read(&mm->master_mm->mmap_sem);
 	mmput(mm);
 
 	return 0;
@@ -339,14 +339,14 @@ nouveau_svmm_init(struct drm_device *dev, void *data,
 
 	/* Enable HMM mirroring of CPU address-space to VMM. */
 	svmm->mm = get_task_mm(current);
-	down_write(&svmm->mm->mmap_sem);
+	down_write(&svmm->mm->master_mm->mmap_sem);
 	svmm->mirror.ops = &nouveau_svmm;
 	ret = hmm_mirror_register(&svmm->mirror, svmm->mm);
 	if (ret == 0) {
 		cli->svm.svmm = svmm;
 		cli->svm.cli = cli;
 	}
-	up_write(&svmm->mm->mmap_sem);
+	up_write(&svmm->mm->master_mm->mmap_sem);
 	mmput(svmm->mm);
 
 done:
@@ -570,11 +570,11 @@ nouveau_svm_fault(struct nvif_notify *notify)
 		/* Intersect fault window with the CPU VMA, cancelling
 		 * the fault if the address is invalid.
 		 */
-		down_read(&svmm->mm->mmap_sem);
+		down_read(&svmm->mm->master_mm->mmap_sem);
 		vma = find_vma_intersection(svmm->mm, start, limit);
 		if (!vma) {
 			SVMM_ERR(svmm, "wndw %016llx-%016llx", start, limit);
-			up_read(&svmm->mm->mmap_sem);
+			up_read(&svmm->mm->master_mm->mmap_sem);
 			nouveau_svm_fault_cancel_fault(svm, buffer->fault[fi]);
 			continue;
 		}
@@ -584,7 +584,7 @@ nouveau_svm_fault(struct nvif_notify *notify)
 
 		if (buffer->fault[fi]->addr != start) {
 			SVMM_ERR(svmm, "addr %016llx", buffer->fault[fi]->addr);
-			up_read(&svmm->mm->mmap_sem);
+			up_read(&svmm->mm->master_mm->mmap_sem);
 			nouveau_svm_fault_cancel_fault(svm, buffer->fault[fi]);
 			continue;
 		}
@@ -667,7 +667,7 @@ again:
 			svmm->vmm->vmm.object.client->super = false;
 			mutex_unlock(&svmm->mutex);
 		}
-		up_read(&svmm->mm->mmap_sem);
+		up_read(&svmm->mm->master_mm->mmap_sem);
 
 		/* Cancel any faults in the window whose pages didn't manage
 		 * to keep their valid bit, or stay writeable when required.

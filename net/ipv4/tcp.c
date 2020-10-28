@@ -1766,7 +1766,7 @@ static int tcp_zerocopy_receive(struct sock *sk,
 
 	sock_rps_record_flow(sk);
 
-	down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->master_mm->mmap_sem);
 
 	ret = -EINVAL;
 	vma = find_vma(current->mm, address);
@@ -1828,7 +1828,7 @@ static int tcp_zerocopy_receive(struct sock *sk,
 		frags++;
 	}
 out:
-	up_read(&current->mm->mmap_sem);
+	up_read(&current->mm->master_mm->mmap_sem);
 	if (length) {
 		tp->copied_seq = seq;
 		tcp_rcv_space_adjust(sk);
