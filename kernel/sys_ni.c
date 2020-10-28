@@ -450,3 +450,9 @@ COND_SYSCALL(setuid16);
 
 /* restartable sequence */
 COND_SYSCALL(rseq);
+
+/* checkpoint */
+COND_SYSCALL(as_generation_create);
+COND_SYSCALL(as_generation_migrate);
+COND_SYSCALL(as_generation_pin);
+COND_SYSCALL(as_generation_delete);

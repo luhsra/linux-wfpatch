@@ -433,3 +433,8 @@
 425	i386	io_uring_setup		sys_io_uring_setup		__ia32_sys_io_uring_setup
 426	i386	io_uring_enter		sys_io_uring_enter		__ia32_sys_io_uring_enter
 427	i386	io_uring_register	sys_io_uring_register		__ia32_sys_io_uring_register
+
+1000	i386	as_generation_create	sys_as_generation_create	__ia32_sys_as_generation_create
+1001	i386	as_generation_migrate	sys_as_generation_migrate	__ia32_sys_as_generation_migrate
+1002	i386	as_generation_pin	sys_as_generation_pin		__ia32_sys_as_generation_pin
+1003	i386	as_generation_delete	sys_as_generation_delete	__ia32_sys_as_generation_delete

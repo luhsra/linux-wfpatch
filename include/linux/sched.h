@@ -677,6 +677,11 @@ struct task_struct {
 	struct rb_node			pushable_dl_tasks;
 #endif
 
+#ifdef CONFIG_AS_GENERATIONS
+	struct list_head		mm_generations;        /* only group_leader */
+	int                             max_generation_id;     /* only group_leader */
+	int                             current_generation_id; /* thread sepcific */
+#endif
 	struct mm_struct		*mm;
 	struct mm_struct		*active_mm;
 
@@ -1220,6 +1225,13 @@ struct task_struct {
 static inline struct pid *task_pid(struct task_struct *task)
 {
 	return task->thread_pid;
+}
+
+/*
+ * Note: Usually only group_leaders do have mm generations
+ */
+static inline bool has_mm_generations(struct task_struct *task) {
+	return task->max_generation_id > 0;
 }
 
 /*

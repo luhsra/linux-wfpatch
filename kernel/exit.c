@@ -67,6 +67,7 @@
 #include <asm/unistd.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
+#include <linux/as_generation.h>
 
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
@@ -775,6 +776,7 @@ void __noreturn do_exit(long code)
 {
 	struct task_struct *tsk = current;
 	int group_dead;
+	bool has_as_gens = tsk->mm && has_as_generations(tsk->mm);
 
 	profile_task_exit(tsk);
 	kcov_task_exit(tsk);
@@ -862,8 +864,24 @@ void __noreturn do_exit(long code)
 
 	exit_mm();
 
-	if (group_dead)
+	if (group_dead) {
+		struct mm_generation *generation, *tmp;
+
 		acct_process();
+
+		if (has_as_gens) {
+			// The master_mm must be freed last.
+			// It is the first one in the list, so traverse in reverse.
+			list_for_each_entry_safe_reverse(generation, tmp,
+							 &tsk->group_leader->mm_generations,
+							 head) {
+				struct mm_struct *gen_mm = generation->mm;
+				list_del(&generation->head);
+				kfree(generation);
+				mmput(gen_mm);
+			}
+		}
+	}
 	trace_sched_process_exit(tsk);
 
 	exit_sem(tsk);

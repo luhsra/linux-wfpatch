@@ -833,8 +833,20 @@ __SYSCALL(__NR_io_uring_enter, sys_io_uring_enter)
 #define __NR_io_uring_register 427
 __SYSCALL(__NR_io_uring_register, sys_io_uring_register)
 
+#define __NR_as_generation_create 428
+__SYSCALL(__NR_as_generation_create, sys_as_generation_create)
+
+#define __NR_as_generation_migrate 429
+__SYSCALL(__NR_as_generation_migrate, sys_as_generation_migrate)
+
+#define __NR_as_generation_pin 430
+__SYSCALL(__NR_as_generation_pin, sys_as_generation_pin)
+
+#define __NR_as_generation_delete 431
+__SYSCALL(__NR_as_generation_delete, sys_as_generation_delete)
+
 #undef __NR_syscalls
-#define __NR_syscalls 428
+#define __NR_syscalls 432
 
 /*
  * 32 bit systems traditionally used different

@@ -1204,6 +1204,13 @@ asmlinkage long sys_mmap_pgoff(unsigned long addr, unsigned long len,
 asmlinkage long sys_old_mmap(struct mmap_arg_struct __user *arg);
 
 
+#ifdef CONFIG_AS_GENERATIONS
+asmlinkage long sys_as_generation_create(void);
+asmlinkage long sys_as_generation_migrate(int id);
+asmlinkage long sys_as_generation_pin(unsigned long addr, unsigned long len);
+asmlinkage long sys_as_generation_delete(int id);
+#endif
+
 /*
  * Not a real system call, but a placeholder for syscalls which are
  * not implemented -- see kernel/sys_ni.c

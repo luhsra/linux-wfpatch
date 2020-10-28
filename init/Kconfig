@@ -1568,6 +1568,15 @@ config DEBUG_RSEQ
 
 	  If unsure, say N.
 
+config AS_GENERATIONS
+	bool "Enable address space generations system calls"
+	default y
+	help
+	  Enable address space generations system calls.
+
+	  If unsure, say Y.
+
+
 config EMBEDDED
 	bool "Embedded system"
 	option allnoconfig_y

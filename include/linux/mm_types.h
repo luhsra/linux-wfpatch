@@ -334,6 +334,8 @@ struct vm_area_struct {
 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 #endif
 	struct vm_userfaultfd_ctx vm_userfaultfd_ctx;
+
+	bool as_generation_shared;
 } __randomize_layout;
 
 struct core_thread {
@@ -438,6 +440,9 @@ struct mm_struct {
 		unsigned long flags; /* Must use atomic bitops to access */
 
 		struct core_state *core_state; /* coredumping support */
+
+		struct list_head generation_siblings;
+		struct mm_struct *master_mm;
 #ifdef CONFIG_MEMBARRIER
 		atomic_t membarrier_state;
 #endif
@@ -512,6 +517,11 @@ struct mm_struct {
 };
 
 extern struct mm_struct init_mm;
+
+static inline bool has_as_generations(struct mm_struct *mm)
+{
+	return !list_empty(&mm->generation_siblings);
+}
 
 /* Pointer magic because the dynamic array size confuses some compilers. */
 static inline void mm_init_cpumask(struct mm_struct *mm)
