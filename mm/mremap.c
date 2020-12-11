@@ -589,7 +589,8 @@ static unsigned long do_mremap(struct mm_struct *mm, bool *downgraded,
 			       struct list_head *uf_unmap,
 			       unsigned long addr, unsigned long old_len,
 			       unsigned long new_len, unsigned long flags,
-			       unsigned long new_addr)
+			       unsigned long new_addr,
+			       unsigned long precalculated_new_addr)
 {
 	struct vm_area_struct *vma;
 	unsigned long ret = -EINVAL;
@@ -665,7 +666,12 @@ static unsigned long do_mremap(struct mm_struct *mm, bool *downgraded,
 		if (vma->vm_flags & VM_MAYSHARE)
 			map_flags |= MAP_SHARED;
 
-		new_addr = get_unmapped_area(vma->vm_file, 0, new_len,
+		if (precalculated_new_addr > 0)
+			map_flags |= MAP_FIXED;
+
+		new_addr = get_unmapped_area(vma->vm_file,
+					precalculated_new_addr,
+					new_len,
 					vma->vm_pgoff +
 					((addr - vma->vm_start) >> PAGE_SHIFT),
 					map_flags);
@@ -728,21 +734,20 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
 		return -EINTR;
 
 	ret = do_mremap(mm, &downgraded, &locked, &uf, &uf_unmap_early,
-			&uf_unmap, addr, old_len, new_len, flags, new_addr);
+			&uf_unmap, addr, old_len, new_len, flags, new_addr, 0);
 
 	/* Do the same for all as_generations */
 	if (has_as_generations(mm)) {
 		struct mm_struct *mm_cursor;
 		unsigned long other_ret;
 
-		printk(KERN_INFO "AS generation: remap (%lxu)\n", addr);
 		list_for_each_entry(mm_cursor,
 				    &mm->generation_siblings,
 				    generation_siblings) {
-			printk(KERN_INFO "AS generation:  -> sibling\n");
 			other_ret = do_mremap(mm_cursor, &downgraded, &locked, &uf,
 					      &uf_unmap_early, &uf_unmap,
-					      addr, old_len, new_len, flags, new_addr);
+					      addr, old_len, new_len, flags,
+					      new_addr, ret);
 			BUG_ON(ret != other_ret);
 		}
 	}
