@@ -1292,8 +1292,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 	 * purposes.
 	 */
 	if (tsk->clear_child_tid) {
-		if (!(tsk->signal->flags & SIGNAL_GROUP_COREDUMP) &&
-		    atomic_read(&mm->mm_users) > 1) {
+		if (!(tsk->signal->flags & SIGNAL_GROUP_COREDUMP)) {
 			/*
 			 * We don't check the error code - if userspace has
 			 * not set up a proper pointer then tough luck.

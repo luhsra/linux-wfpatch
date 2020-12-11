@@ -3921,6 +3921,9 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 			return VM_FAULT_GENERATION_RETRY;
 		} else if (has_as_generations(vmf->vma->vm_mm)) {
 			struct mm_struct *mm_cursor;
+			if (atomic_cmpxchg_acquire(&vmf->vma->vm_mm->as_zapping, 0, 1) != 0) {
+				return VM_FAULT_GENERATION_RETRY;
+			}
 			list_for_each_entry(mm_cursor,
 					    &vmf->vma->vm_mm->generation_siblings,
 					    generation_siblings) {
@@ -3929,6 +3932,7 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 				WARN_ON(other_vma == NULL);
 				zap_page_range(other_vma, vmf->address, PAGE_SIZE);
 			}
+			atomic_set_release(&vmf->vma->vm_mm->as_zapping, 0);
 		}
 	}
 
@@ -4096,7 +4100,11 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 				find_vma(vma->vm_mm->master_mm, address);
 			BUG_ON(!master_vma);
 			ret = __handle_mm_fault(master_vma, address, flags);
-			__handle_mm_fault(vma, address, flags);
+			if (ret == VM_FAULT_GENERATION_RETRY) {
+				ret = 0;
+			} else {
+				__handle_mm_fault(vma, address, flags);
+			}
 		}
 	}
 

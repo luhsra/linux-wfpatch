@@ -879,7 +879,8 @@ void __noreturn do_exit(long code)
 				struct mm_struct *gen_mm = generation->mm;
 				list_del(&generation->head);
 				kfree(generation);
-				mmput(gen_mm);
+				if (gen_mm)
+					mmput(gen_mm);
 			}
 		}
 	}

@@ -443,6 +443,7 @@ struct mm_struct {
 
 		struct list_head generation_siblings;
 		struct mm_struct *master_mm;
+		atomic_t as_zapping;
 #ifdef CONFIG_MEMBARRIER
 		atomic_t membarrier_state;
 #endif
