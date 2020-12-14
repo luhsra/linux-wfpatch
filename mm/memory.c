@@ -2921,35 +2921,41 @@ static int find_as_generation_sibling_page(struct vm_fault *vmf, vm_fault_t *ret
 	int rss[NR_MM_COUNTERS];
 	pte_t *ptep;
 	spinlock_t *ptl;
+	init_rss_vec(rss);
+
+	if (pte_alloc(vma->vm_mm, vmf->pmd)) {
+		*ret = VM_FAULT_OOM;
+		return 2;
+	}
+
+	/* See the comment in pte_alloc_one_map() */
+	if (unlikely(pmd_trans_unstable(vmf->pmd)))
+		return 0;
 
 	if (follow_pte(master_mm, vmf->address, &ptep, &ptl) == 0) {
-		if (!vmf->pte) {
-			*ret = pte_alloc_one_map(vmf);
-			if (*ret != 0) {
-				pte_unmap_unlock(ptep, ptl);
-				return 2;
-			}
-		}
-
-		if (unlikely(!pte_none(*vmf->pte))) {
+		vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
+					       &vmf->ptl);
+		if (!pte_none(*vmf->pte)) {
 			pte_unmap_unlock(vmf->pte, vmf->ptl);
 			pte_unmap_unlock(ptep, ptl);
-			*ret = VM_FAULT_NOPAGE;
-			return 2;
+			return 0; // pte has been set by a concurrent fault
 		}
 
-		init_rss_vec(rss);
-		arch_enter_lazy_mmu_mode();
-		if (!pte_none(*ptep)) {
-			copy_pte_ret = copy_one_pte(vma->vm_mm, master_mm, vmf->pte, ptep,
-						    vma, vmf->address, rss, true);
-			BUG_ON(copy_pte_ret);
+		if (pte_none(*ptep)) {
 			pte_unmap_unlock(vmf->pte, vmf->ptl);
+			pte_unmap_unlock(ptep, ptl);
+			return 1;
 		}
-		arch_leave_lazy_mmu_mode();
-		pte_unmap_unlock(ptep, ptl);
-		add_mm_rss_vec(vma->vm_mm, rss);
 
+		arch_enter_lazy_mmu_mode();
+		copy_pte_ret = copy_one_pte(vma->vm_mm, master_mm, vmf->pte, ptep,
+						    vma, vmf->address, rss, true);
+		BUG_ON(copy_pte_ret);
+		arch_leave_lazy_mmu_mode();
+		pte_unmap_unlock(vmf->pte, vmf->ptl);
+		pte_unmap_unlock(ptep, ptl);
+
+		add_mm_rss_vec(vma->vm_mm, rss);
 		return 0;
 	}
 	return 1;
@@ -3917,23 +3923,21 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 	}
 
 	if (vmf->vma->as_generation_shared) {
-		if (vmf->vma->vm_mm != vmf->vma->vm_mm->master_mm) {
+		static atomic_t as_zapping;
+		struct mm_struct *mm_cursor;
+		if (vmf->vma->vm_mm != vmf->vma->vm_mm->master_mm)
 			return VM_FAULT_GENERATION_RETRY;
-		} else if (has_as_generations(vmf->vma->vm_mm)) {
-			struct mm_struct *mm_cursor;
-			if (atomic_cmpxchg_acquire(&vmf->vma->vm_mm->as_zapping, 0, 1) != 0) {
-				return VM_FAULT_GENERATION_RETRY;
-			}
-			list_for_each_entry(mm_cursor,
-					    &vmf->vma->vm_mm->generation_siblings,
-					    generation_siblings) {
-				struct vm_area_struct *other_vma =
-					find_vma(mm_cursor, vmf->address);
-				WARN_ON(other_vma == NULL);
-				zap_page_range(other_vma, vmf->address, PAGE_SIZE);
-			}
-			atomic_set_release(&vmf->vma->vm_mm->as_zapping, 0);
+		if (atomic_cmpxchg_acquire(&as_zapping, 0, 1) != 0)
+			return 0;
+		list_for_each_entry(mm_cursor,
+				    &vmf->vma->vm_mm->generation_siblings,
+				    generation_siblings) {
+			struct vm_area_struct *other_vma =
+				find_vma(mm_cursor, vmf->address);
+			WARN_ON(other_vma == NULL);
+			zap_page_range(other_vma, vmf->address, PAGE_SIZE);
 		}
+		atomic_set_release(&as_zapping, 0);
 	}
 
 	if (pte_protnone(vmf->orig_pte) && vma_is_accessible(vmf->vma)) {
@@ -4100,11 +4104,7 @@ vm_fault_t handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 				find_vma(vma->vm_mm->master_mm, address);
 			BUG_ON(!master_vma);
 			ret = __handle_mm_fault(master_vma, address, flags);
-			if (ret == VM_FAULT_GENERATION_RETRY) {
-				ret = 0;
-			} else {
-				__handle_mm_fault(vma, address, flags);
-			}
+			__handle_mm_fault(vma, address, flags);
 		}
 	}
 

@@ -31,7 +31,7 @@ SYSCALL_DEFINE0(as_generation_create)
 	struct mm_generation *new_generation;
 	int id;
 
-	printk(KERN_INFO "as_generation: create\n");
+	/* printk(KERN_INFO "as_generation: create\n"); */
 
 	target = current;
 	group_leader = target->group_leader;
@@ -88,8 +88,8 @@ SYSCALL_DEFINE1(as_generation_migrate, int, id)
 	group_leader = target->group_leader;
 	old_id = target->current_generation_id;
 
-	printk(KERN_INFO "as_generation: migrate - pid: %d, thread: %d, from: %d to: %d\n",
-	       group_leader->pid, target->pid, old_id, id);
+	/* printk(KERN_INFO "as_generation: migrate - pid: %d, thread: %d, from: %d to: %d\n", */
+	       /* group_leader->pid, target->pid, old_id, id); */
 
 	task_lock(group_leader);
 
@@ -129,7 +129,7 @@ SYSCALL_DEFINE1(as_generation_migrate, int, id)
 	activate_mm(old_mm, target->active_mm);
 	mmput(old_mm);
 
-	printk(KERN_INFO "as_generation: thread: %d: migration successful\n", target->pid);
+	/* printk(KERN_INFO "as_generation: thread: %d: migration successful\n", target->pid); */
 
 	return old_id;
 fail:
@@ -229,8 +229,6 @@ SYSCALL_DEFINE1(as_generation_delete, int, id)
 	struct task_struct *group_leader;
 	struct mm_generation *generation = NULL;
 
-	printk(KERN_INFO "as_generation: delete: %d\n", id);
-
 	if (id == 0)
 		return -EPERM;
 
@@ -256,6 +254,8 @@ SYSCALL_DEFINE1(as_generation_delete, int, id)
 
 	mmput(generation->mm);
 	kfree(generation);
+
+	printk(KERN_INFO "as_generation: deleted: %d\n", id);
 
 	return 0;
 
